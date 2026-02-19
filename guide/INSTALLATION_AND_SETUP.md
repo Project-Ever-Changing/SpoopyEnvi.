@@ -3,7 +3,7 @@ Installation and Setup
 
 Spoopy Engine relies heavily on [Lime](https://lime.openfl.org) and would work best using Lime 8.0.0. The framework is made with [Haxe](http://www.haxe.org/download) as its primary language. Make sure to have the [Vulkan SDK](https://vulkan.lunarg.com/) downloaded for the backend side to work.
 
-If you're on Mac OS or Linux(not tested, but should be fine), I recommend installing Haxe with [HomeBrew](https://brew.sh).
+If you're on Mac OS or Linux, I recommend installing Haxe with [HomeBrew](https://brew.sh).
 
 ### <ins>**Lime Installation:**</ins>
 
