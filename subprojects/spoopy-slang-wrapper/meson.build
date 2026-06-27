@@ -39,7 +39,7 @@ endif
 
 slang_include = include_directories('external/slang/include')
 # spoopy_slang_include = include_directories('../../src/renderer/src')
-spoopy_include = include_directories('../../include')
+spoopy_include_arg = '-I' + (meson.global_source_root() / 'include')
 spoopy_generated_include_arg = '-I' + (meson.global_build_root() / 'include')
 bx_include = include_directories('bx/include')
 bx_debug_define = '-DBX_CONFIG_DEBUG=' + (get_option('buildtype').startswith('debug') ? '1' : '0')
@@ -67,8 +67,8 @@ slang_src = [
 
 spoopy_slang_lib = static_library('spoopy-slang',
     slang_src,
-    include_directories: [include_directories('.'), slang_include, spoopy_include, bx_include],
-    cpp_args: [bx_debug_define, spoopy_generated_include_arg],
+    include_directories: [include_directories('.'), slang_include, bx_include],
+    cpp_args: [bx_debug_define, spoopy_include_arg, spoopy_generated_include_arg],
     dependencies: slang_lib,
     install: false,
 )

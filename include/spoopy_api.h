@@ -74,6 +74,8 @@ SPOOPY_FUNC_CORE spoopy_cull_face_mode_t spoopy_api_cull_current(spoopy_pipeline
 
 // TODO (Multi-Window): Have a parameter `window_index` to get it for each window
 SPOOPY_FUNC_CORE spoopy_renderer_t spoopy_api_window_get_renderer(void);
+SPOOPY_FUNC_CORE void* spoopy_api_window_get_native_handle(void);
+SPOOPY_FUNC_CORE void* spoopy_api_window_get_native_drawable(void);
 
 // TODO (Multi-Window): Have a parameter `window_index` to get it for each window
 SPOOPY_FUNC_CORE bool spoopy_api_window_is_fullscreen(void);

@@ -11,3 +11,11 @@ void spoopy_sokol_init(void) {
 		.environment.metal.device = (__bridge const void*) spoopy_metal_init(),
 	});
 }
+
+id<MTLCommandBuffer> spoopy_metal_command_buffer(void) {
+	return _sg.mtl.cmd_buffer;
+}
+
+id<MTLRenderCommandEncoder> spoopy_metal_render_command_encoder(void) {
+	return _sg.mtl.render_cmd_encoder;
+}
