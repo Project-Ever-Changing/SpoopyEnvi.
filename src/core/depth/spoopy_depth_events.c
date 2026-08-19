@@ -22,9 +22,9 @@ static bool spoopy_events_handler_quit(SDL_Event *event, void *arg);
 static bool spoopy_events_handle_video(SDL_Event *event, void *arg);
 
 static const spoopy_event_handler_t default_handlers[] = {
-	{ .proc = spoopy_events_handler_quit, .priority = EPRIO_SYSTEM, .event_type = SDL_EVENT_WINDOW_CLOSE_REQUESTED, .arg = NULL },
+	{ .proc = spoopy_events_handler_quit, .priority = EPRIO_SYSTEM, .event_type = SDL_EVENT_QUIT },
 	{ .proc = spoopy_events_handle_video, .priority = EPRIO_SYSTEM },
-	{ .proc = NULL, .priority = 0, .event_type = 0, .arg = NULL}
+	{ .proc = NULL, .priority = 0, .event_type = 0 }
 };
 
 static spoopy_event_handler_t* spoopy_events_register_default_handlers(spoopy_event_handler_t* h);

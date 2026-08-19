@@ -40,15 +40,15 @@ spoopy_audio_src = files(
 	'spoopy_mixer.c',
 )
 
-# TODO (Summary): Have a enabled backends to put into the summary
-
 spoopy_audio_deps = []
 audio_macro = []
+enabled_audio_backends = []
 
 foreach audio_backend, aopt : audio_backend_opts
 	if aopt.allowed()
 		subdir(audio_backend)
 		audio_macro += ['AUDIO(@0@)'.format(audio_backend)]
+		enabled_audio_backends += audio_backend
 
 		spoopy_audio_src += get_variable(f'audio_@audio_backend@_src')
 	endif

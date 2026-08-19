@@ -1,5 +1,8 @@
-spoopy_memory_src = files('spoopy_core_memory.c')
 spoopy_memory_deps = []
+spoopy_memory_src  = files(
+	'spoopy_arena_memory.c',
+	'spoopy_core_memory.c',
+)
 
 allocator = get_option('allocator')
 if allocator == 'default'

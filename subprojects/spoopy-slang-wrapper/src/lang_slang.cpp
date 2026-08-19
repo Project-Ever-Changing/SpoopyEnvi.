@@ -1,3 +1,11 @@
+// Real Slang runtime implementation.
+//
+// Structured after Taisei's lang_spirv.c: file-local helpers do the work,
+// reflection is split into _slang_reflect_{ubos,samplers,inputs} orchestrated by
+// _slang_reflect_all, and the small _slang_* interface (declared in
+// lang_slang_private.hpp) is what the public aux layer calls into.
+
+#include "lang_slang_private.hpp"
 #include "libs.hpp"
 
 #include <slang.h>
@@ -58,6 +66,14 @@ struct reflection_input_tmp {
 	tiny_string name;
 	uint16_t location;
 	uint16_t num_locations_consumed;
+};
+
+struct slang_reflect_context {
+	spoopy_mem_arena_t* arena;
+	slang::ProgramLayout* program_layout;
+	tinystl::vector<reflection_block_tmp> blocks;
+	tinystl::vector<reflection_sampler_tmp> samplers;
+	tinystl::vector<reflection_input_tmp> inputs;
 };
 
 static size_t clamp_u16(size_t value) {
@@ -804,6 +820,44 @@ static spoopy_shader_reflection_t* materialize_reflection(
 	return reflection;
 }
 
+// Reflection passes, mirroring Taisei's _spirv_reflect_{ubos,samplers,inputs}.
+
+static void _slang_reflect_ubos(slang_reflect_context* rctx) {
+	slang::VariableLayoutReflection* globals_layout = rctx->program_layout->getGlobalParamsVarLayout();
+	if(globals_layout) {
+		collect_uniform_blocks(globals_layout, rctx->blocks);
+	}
+}
+
+static void _slang_reflect_samplers(slang_reflect_context* rctx) {
+	slang::VariableLayoutReflection* globals_layout = rctx->program_layout->getGlobalParamsVarLayout();
+	if(globals_layout) {
+		collect_sampler_bindings_recursive(globals_layout, rctx->samplers);
+	}
+}
+
+static void _slang_reflect_inputs(slang_reflect_context* rctx) {
+	if(rctx->program_layout->getEntryPointCount() == 0) {
+		return;
+	}
+
+	slang::EntryPointReflection* entry_point = rctx->program_layout->getEntryPointByIndex(0);
+	if(!entry_point) {
+		return;
+	}
+
+	unsigned param_count = entry_point->getParameterCount();
+	for(unsigned i = 0; i < param_count; ++i) {
+		collect_input_fields_recursive(entry_point->getParameterByIndex(i), rctx->inputs);
+	}
+}
+
+static void _slang_reflect_all(slang_reflect_context* rctx) {
+	_slang_reflect_ubos(rctx);
+	_slang_reflect_samplers(rctx);
+	_slang_reflect_inputs(rctx);
+}
+
 static spoopy_shader_reflection_t* build_reflection(
 	spoopy_mem_arena_t* arena,
 	slang::IComponentType* linked_program
@@ -820,39 +874,23 @@ static spoopy_shader_reflection_t* build_reflection(
 		return NULL;
 	}
 
-	tinystl::vector<reflection_block_tmp> blocks;
-	tinystl::vector<reflection_sampler_tmp> samplers;
-	tinystl::vector<reflection_input_tmp> inputs;
+	slang_reflect_context rctx = { };
+	rctx.arena = arena;
+	rctx.program_layout = program_layout;
 
-	slang::VariableLayoutReflection* globals_layout = program_layout->getGlobalParamsVarLayout();
-	if(globals_layout) {
-		collect_sampler_bindings_recursive(globals_layout, samplers);
-		collect_uniform_blocks(globals_layout, blocks);
-	}
+	_slang_reflect_all(&rctx);
 
-	if(program_layout->getEntryPointCount() > 0) {
-		slang::EntryPointReflection* entry_point = program_layout->getEntryPointByIndex(0);
-		if(entry_point) {
-			unsigned param_count = entry_point->getParameterCount();
-			for(unsigned i = 0; i < param_count; ++i) {
-				collect_input_fields_recursive(entry_point->getParameterByIndex(i), inputs);
-			}
-		}
-	}
-
-	return materialize_reflection(arena, blocks, samplers, inputs);
+	return materialize_reflection(arena, rctx.blocks, rctx.samplers, rctx.inputs);
 }
 
 } // namespace
-
-extern "C" {
 
 static_assert(SPOOPY_OPTIMIZATION_LEVEL_NONE == (int)SLANG_OPTIMIZATION_LEVEL_NONE, "");
 static_assert(SPOOPY_OPTIMIZATION_LEVEL_DEFAULT == (int)SLANG_OPTIMIZATION_LEVEL_DEFAULT, "");
 static_assert(SPOOPY_OPTIMIZATION_LEVEL_HIGH == (int)SLANG_OPTIMIZATION_LEVEL_HIGH, "");
 static_assert(SPOOPY_OPTIMIZATION_LEVEL_MAXIMAL == (int)SLANG_OPTIMIZATION_LEVEL_MAXIMAL, "");
 
-bool spoopy_global_context_init(void) {
+bool _slang_init_compiler(void) {
 	static bool logged_profiles = false;
 
 	if(global_context.global_session) {
@@ -888,23 +926,15 @@ bool spoopy_global_context_init(void) {
 	return true;
 }
 
-void spoopy_shader_cleanup(void) {
+void _slang_shutdown_compiler(void) {
 	global_context.global_session = nullptr;
 }
 
-void spoopy_shader_source_cleanup(spoopy_shader_source_t* source) {
-	if(!source) {
-		return;
-	}
-
-	memset(source, 0, sizeof(*source));
+bool _slang_shader_supported(const spoopy_shader_source_t* source, spoopy_transpile_options_t* transpile_opts) {
+	return resolve_supported_target(source, transpile_opts, NULL);
 }
 
-bool spoopy_api_shader_supported(const spoopy_shader_source_t* info, spoopy_transpile_options_t* transpile_opts) {
-	return resolve_supported_target(info, transpile_opts, NULL);
-}
-
-bool spoopy_api_shader_transpile(
+bool _slang_compile(
 	spoopy_shader_source_t* source,
 	spoopy_shader_source_t* target,
 	spoopy_transpile_options_t* transpile_opts,
@@ -925,11 +955,6 @@ bool spoopy_api_shader_transpile(
 	Slang::ComPtr<IComponentType> linked;
 	Slang::ComPtr<IBlob> code_diagnostics;
 	Slang::ComPtr<IBlob> code_blob;
-
-	if(!source || !target || !arena || !source->content || !source->entry_point) {
-		SPOOPY_LOG_ERROR("Invalid shader transpile parameters");
-		return false;
-	}
 
 	memset(target, 0, sizeof(*target));
 
@@ -1068,28 +1093,3 @@ fail:
 	memset(target, 0, sizeof(*target));
 	return false;
 }
-
-void spoopy_api_add_macro(spoopy_transpile_options_t* options, const char* name, const char* value) {
-	if(!options || !name || !value) {
-		SPOOPY_LOG_ERROR("Invalid parameters for adding a shader macro");
-		return;
-	}
-
-	size_t new_count = options->macro_count + 1;
-	spoopy_shader_macro_t* new_macros = (spoopy_shader_macro_t*)spoopy_heap_realloc(
-		options->macros,
-		new_count * sizeof(*new_macros)
-	);
-
-	if(!new_macros) {
-		SPOOPY_LOG_ERROR("Failed to grow shader macro array");
-		return;
-	}
-
-	options->macros = new_macros;
-	options->macros[options->macro_count].name = name;
-	options->macros[options->macro_count].value = value;
-	options->macro_count = new_count;
-}
-
-} // extern "C"

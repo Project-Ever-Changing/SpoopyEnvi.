@@ -156,14 +156,18 @@ if not spoopy_sys_threads_support
     config.set('SPOOPY_SUPPORT_SDL_THREADS', 0)
 endif
 
-# TODO (Summary): Put quite a bit more summaries here
-# Like: `system type`, `build type`, `memory allocator`,	`debug mode`
-# Plus: `audio backend`, `slang runtime toggle`
-# Final: `documentation` and the other stuff related to that
+summary({
+    'Version' : meson.project_version(),
+    'System type' : systype,
+    'Build type' : get_option('buildtype'),
+    'Memory allocator' : allocator,
+    'Debug build' : is_debug_build,
+}, section : 'Main', bool_yn : true)
 
 summary({
-    'System Type': systype,
-    'Build Type': is_debug_build ? 'debug' : 'release',
-    'Deprecation Warnings': deprecation_warnings,
-    'SDL Threading Support': spoopy_sys_threads_support ? 'enabled' : 'disabled',
-}, section: 'Configuration', bool_yn: true)
+    'Audio backends' : '@0@ (default: @1@)'.format(', '.join(enabled_audio_backends), default_audio_backend),
+    'Rendering backends' : '@0@ (default: @1@)'.format(', '.join(enabled_renderer_backends), default_renderer_backend),
+    'FastNoiseLite' : get_option('fastnoiselite'),
+    'SDL threading' : spoopy_sys_threads_support,
+    'Deprecation warnings' : deprecation_warnings,
+}, section : 'Features', bool_yn : true)

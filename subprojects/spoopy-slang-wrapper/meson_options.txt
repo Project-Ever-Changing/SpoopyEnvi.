@@ -1,0 +1,5 @@
+option('slang_runtime',
+    type: 'boolean',
+    value: true,
+    description: 'Build the real Slang runtime; disable to build the no-op stub instead'
+)

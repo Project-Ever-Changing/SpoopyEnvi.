@@ -61,43 +61,60 @@ else
     )
 endif
 
-slang_src = [
-    'src/spoopy_libs_api.cpp'
-]
+slang_runtime_enabled = get_option('slang_runtime')
+
+# The public C-ABI (aux) is always built; the internal _slang_* implementation
+# is either the real Slang backend or a no-op stub. Mirrors Taisei's lang_spirv
+# {,_aux,_stub} split.
+slang_src = ['src/lang_slang_aux.cpp']
+slang_lib_deps = []
+
+if slang_runtime_enabled
+    slang_src += 'src/lang_slang.cpp'
+    slang_lib_deps += slang_lib
+else
+    slang_src += 'src/lang_slang_stub.cpp'
+endif
 
 spoopy_slang_lib = static_library('spoopy-slang',
     slang_src,
     include_directories: [include_directories('.'), slang_include, bx_include],
     cpp_args: [bx_debug_define, spoopy_include_arg, spoopy_generated_include_arg],
-    dependencies: slang_lib,
+    dependencies: slang_lib_deps,
     install: false,
 )
 
 spoopy_slang_dep = declare_dependency(
     link_with: spoopy_slang_lib,
     include_directories: slang_include,
-    dependencies: slang_lib,
+    dependencies: slang_lib_deps,
 )
 
-# Copy the slang dylib to the build directory for runtime linking
-slang_dylib_source = slang_paths['lib']
-slang_dylib_dest = meson.global_build_root() / 'src' / 'core' / 'libslang.dylib'
+# The real runtime links against libslang at runtime; copy the dylib next to the
+# build output. Not needed for the stub.
+wrapper_extra_sources = []
 
-# Use a custom target to copy the dylib during build
-copy_slang_dylib = custom_target('copy_slang_dylib',
-    input: [],
-    output: 'libslang_copied',
-    command: [
-        'cp', slang_dylib_source, slang_dylib_dest
-    ],
-    build_by_default: true,
-    build_always_stale: true
-)
+if slang_runtime_enabled
+    slang_dylib_source = slang_paths['lib']
+    slang_dylib_dest = meson.global_build_root() / 'src' / 'core' / 'libslang.dylib'
+
+    copy_slang_dylib = custom_target('copy_slang_dylib',
+        input: [],
+        output: 'libslang_copied',
+        command: [
+            'cp', slang_dylib_source, slang_dylib_dest
+        ],
+        build_by_default: true,
+        build_always_stale: true
+    )
+
+    wrapper_extra_sources += copy_slang_dylib
+endif
 
 # Export the dependency for the parent project
 spoopy_slang_wrapper_dep = declare_dependency(
     link_with: spoopy_slang_lib,
     include_directories: slang_include,
-    dependencies: slang_lib,
-    sources: copy_slang_dylib
+    dependencies: slang_lib_deps,
+    sources: wrapper_extra_sources
 )
